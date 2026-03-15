@@ -1,0 +1,69 @@
+Metadata-Version: 2.4
+Name: egyptian-law-assistant
+Version: 0.1.0
+Summary: RAG system for Egyptian corporate law documents
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: llama-index>=0.10.0
+Requires-Dist: llama-index-vector-stores-chroma>=0.1.0
+Requires-Dist: llama-index-embeddings-ollama>=0.1.0
+Requires-Dist: llama-index-llms-ollama>=0.1.0
+Requires-Dist: chromadb>=0.4.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: structlog>=23.0.0
+Requires-Dist: httpx>=0.25.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: anthropic>=0.7.0
+Requires-Dist: asyncio
+Requires-Dist: pathlib
+Requires-Dist: typing
+
+# Egyptian Law Assistant
+
+A Retrieval-Augmented Generation (RAG) system designed to assist with Egyptian legal documents, supporting Arabic text processing and multiple LLM providers.
+
+## Architecture
+
+The system follows a modular architecture with bounded contexts:
+
+- **Document Processing**: Ingests and processes legal documents (PDFs, DOCX) into chunks with metadata extraction.
+- **Knowledge Base**: Manages vector embeddings and indexing using ChromaDB.
+- **Query Engine**: Handles retrieval and response generation.
+- **LLM Providers**: Abstraction for Ollama and Claude APIs.
+- **Evaluation**: Uses Ragas for metrics and MLflow for tracking.
+- **API**: FastAPI-based REST API for queries and ingestion.
+
+## Quick Start
+
+1. **Setup Environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys and settings
+   ```
+
+2. **Start Services**:
+   ```bash
+   make up
+   ```
+
+3. **Ingest Documents**:
+   Place PDF/DOCX files in `data/raw/`
+   ```bash
+   make ingest
+   ```
+
+4. **Run Tests**:
+   ```bash
+   make test
+   ```
+
+5. **Query the API**:
+   The API will be available at `http://localhost:8000`
+
+## Decision Log
+
+- **LLM Abstraction**: Supports both local (Ollama) and cloud (Claude) providers for flexibility.
+- **Arabic Support**: Uses Arabic-aware chunking and metadata extraction.
+- **Performance**: Streaming batch ingestion, two-level caching, async query pipeline.
+- **Testing**: Comprehensive unit/integration/e2e tests with Ragas evaluation.
+- **Deployment**: Separate containers for ingestion and query services.

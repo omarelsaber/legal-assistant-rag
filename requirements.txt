@@ -1,0 +1,13 @@
+llama-index
+chromadb
+fastapi
+uvicorn[standard]
+ragas
+mlflow
+pydantic-settings
+structlog
+python-docx
+PyMuPDF
+sentence-transformers
+httpx
+anthropic
