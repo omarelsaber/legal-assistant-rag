@@ -1,47 +1,10 @@
-# ── RAG Framework ────────────────────────────────────────────────────────────
 llama-index
 llama-index-vector-stores-chroma
-
-# ── LLMs & Embeddings (Providers) ────────────────────────────────────────────
 groq
 llama-index-llms-groq
-
 cohere
 llama-index-embeddings-cohere
-
-ollama==0.3.1
-llama-index-llms-ollama==0.1.5
-llama-index-embeddings-ollama==0.1.5
-
-anthropic==0.34.2
-llama-index-llms-anthropic==0.1.15
-
-# ── Reranking ────────────────────────────────────────────────────────────────
-sentence-transformers==3.1.1
-
-# ── Vector Database ──────────────────────────────────────────────────────────
-chromadb==0.5.5
-
-# ── API ──────────────────────────────────────────────────────────────────────
 fastapi
-uvicorn[standard]
-
-# ── Config & Validation ──────────────────────────────────────────────────────
-pydantic==2.9.2
-pydantic-settings==2.5.2
-
-# ── Document Parsing ─────────────────────────────────────────────────────────
-pymupdf==1.24.10
-python-docx==1.1.2
-
-# ── LLMOps & Evaluation ──────────────────────────────────────────────────────
-ragas==0.1.21
-mlflow==2.16.2
-
-# ── Utilities ────────────────────────────────────────────────────────────────
-more-itertools==10.3.0
-structlog==24.4.0
-tenacity
-pandas==2.2.2
-pyarrow==17.0.0
+uvicorn
 python-dotenv
+tenacity
