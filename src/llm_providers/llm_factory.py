@@ -5,8 +5,6 @@ All pipeline code calls get_llm(settings) — it never imports provider
 classes directly. Swapping providers is a one-line .env change.
 
 Provider mapping:
-  "ollama" → Ollama (local)     — development
-  "claude" → Anthropic Claude   — premium
   "groq"   → Groq Cloud API     — production free tier (recommended)
 
 Arabic compatibility note:
@@ -21,9 +19,7 @@ from __future__ import annotations
 import logging
 
 from llama_index.core.llms import LLM
-from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.groq import Groq
-from llama_index.llms.ollama import Ollama
 
 from src.core.config import Settings
 from src.core.exceptions import ConfigurationError
@@ -69,39 +65,12 @@ def get_llm(settings: Settings) -> LLM:
             api_key=settings.groq_api_key.get_secret_value(),
         )
 
-    # ── Ollama (local development) ────────────────────────────────────────────
-    if provider == "ollama":
-        logger.info(
-            "Initialising Ollama LLM: model=%r  base_url=%r",
-            settings.ollama_model,
-            settings.ollama_base_url,
-        )
-        return Ollama(
-            model=settings.ollama_model,
-            base_url=settings.ollama_base_url,
-            request_timeout=120.0,
-        )
-
-    # ── Claude (Anthropic API) ────────────────────────────────────────────────
-    if provider == "claude":
-        if not settings.claude_api_key:
-            raise ConfigurationError(
-                setting="claude_api_key",
-                reason="CLAUDE_API_KEY must be set when LLM_PROVIDER='claude'.",
-            )
-        logger.info("Initialising Claude LLM: model=%r", settings.claude_model)
-        return Anthropic(
-            model=settings.claude_model,
-            api_key=settings.claude_api_key.get_secret_value(),
-            max_tokens=2048,
-        )
-
     # ── Unknown provider ──────────────────────────────────────────────────────
     raise ConfigurationError(
         setting="llm_provider",
         reason=(
             f"No LLM implementation registered for provider {provider!r}. "
-            f"Supported: 'groq', 'ollama', 'claude'. "
+            f"Supported: 'groq'. "
             f"Update LLM_PROVIDER in your .env file."
         ),
     )
