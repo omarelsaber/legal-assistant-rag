@@ -4,7 +4,6 @@ groq
 llama-index-llms-groq
 cohere
 llama-index-embeddings-cohere
-llama-index-llms-anthropic
 fastapi
 uvicorn
 python-dotenv
