@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { Scale, Target, Layers, Zap, Database, Brain, BarChart3 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { LandingHeader } from "@/components/legal/LandingHeader";
 import { Footer } from "@/components/legal/Footer";
 
 const fadeUp = {
@@ -50,9 +49,20 @@ const About = () => {
   ];
 
   return (
-    <div dir={dir} className="min-h-screen bg-background font-arabic">
-      <LandingHeader />
+    <div dir={dir} className="min-h-screen font-arabic relative overflow-hidden">
+      {/* Cinematic Video Background */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover z-0"
+      >
+        <source src="/about.mp4" type="video/mp4" />
+      </video>
+      <div className="absolute inset-0 bg-black/70 z-0" />
 
+      <div className="relative z-10 w-full">
       {/* Hero */}
       <section className="relative px-4 pt-32 pb-20 text-center">
         <div className="pointer-events-none absolute inset-0">
@@ -184,6 +194,7 @@ const About = () => {
       </section>
 
       <Footer />
+      </div>
     </div>
   );
 };

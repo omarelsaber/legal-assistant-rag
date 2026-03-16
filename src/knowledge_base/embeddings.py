@@ -1,209 +1,168 @@
 """
-
 Embedding model factory for the Egyptian Law Assistant.
 
-
-
 Responsibilities:
+  - Return the correct LlamaIndex BaseEmbedding for the active embedding
+    provider (set via EMBEDDING_PROVIDER env var, independent of LLM_PROVIDER).
+  - Fail fast with a ConfigurationError for unsupported providers.
 
-  - Return the correct LlamaIndex embedding model for the active LLM provider.
+Architectural contract:
+  This is the ONLY file in the codebase that imports LlamaIndex embedding
+  classes. Swapping the embedding backend requires changing only this file.
 
-  - Fail fast with a ``ConfigurationError`` for unsupported providers so the
+Provider matrix (embedding_provider → class):
+  "cohere"  → CohereEmbedding   — production / cloud (FREE tier, Arabic-native)
+  "ollama"  → OllamaEmbedding   — local development only, requires Ollama running
+  "claude"  → CohereEmbedding   — generation uses Claude, embeddings use Cohere
+  "groq"    → CohereEmbedding   — generation uses Groq,   embeddings use Cohere
 
-    error surfaces at startup, not mid-ingestion.
+Why Cohere embed-multilingual-v3.0?
+  - Free tier: 1,000 API calls/month — enough for development and demo traffic.
+  - Native Arabic support: trained on 100+ languages including Arabic MSA.
+  - 1024-dimension output: same as bge-m3, so no ChromaDB schema change.
+  - LlamaIndex integration: first-class, actively maintained.
+  - Zero infrastructure: no Ollama server, no GPU, no Docker — pure HTTPS call.
 
-
-
-Architectural note:
-
-  This module is the single place in the codebase that imports LlamaIndex
-
-  embedding classes. If you ever swap the embedding library (e.g., from
-
-  OllamaEmbedding to HuggingFaceEmbedding), this is the only file to change.
-
-
-
-Supported providers (Architecture Decision #3  provider factory pattern):
-
-  - "ollama"   OllamaEmbedding  (local, free, requires Ollama running)
-
-  - "claude"   OllamaEmbedding  (Anthropic has no native embedding API;
-
-                                   Ollama is still used for embeddings even
-
-                                   when Claude is the generation provider.
-
-                                   This is a deliberate design choice: keep
-
-                                   the embedding model independent of the
-
-                                   generation provider.)
-
-
-
-Future providers to add here:
-
-  - "openai"         OpenAIEmbedding
-
-  - "huggingface"    HuggingFaceEmbedding (fully local, no Ollama required)
-
+Critical: input_type matters for retrieval quality
+  Cohere's Embed v3 is an asymmetric model — the same text embedded with
+  different input_type values produces vectors in different subspaces:
+    "search_document" → used during ingestion (build_index)
+    "search_query"    → used during querying (execute_query)
+  Mixing these types causes silent retrieval quality degradation.
+  The settings expose EMBEDDING_INPUT_TYPE to let the ingestion script
+  and the query pipeline each set the correct value.
 """
-
-
 
 from __future__ import annotations
 
-
-
 import logging
-
-
 
 from llama_index.core.base.embeddings.base import BaseEmbedding
 
-from llama_index.embeddings.ollama import OllamaEmbedding
-
-
-
 from src.core.config import Settings
-
 from src.core.exceptions import ConfigurationError
-
-
 
 logger = logging.getLogger(__name__)
 
+# ── Supported embedding providers ─────────────────────────────────────────────
+# Providers that route through Cohere (all cloud/API-based providers)
+_COHERE_PROVIDERS = frozenset({"cohere", "groq", "claude"})
 
-
+# Providers that route through Ollama (local only)
+_OLLAMA_PROVIDERS = frozenset({"ollama"})
 
 
 def get_embedding_model(settings: Settings) -> BaseEmbedding:
-
     """
+    Return a LlamaIndex ``BaseEmbedding`` configured for the active provider.
 
-    Return a LlamaIndex embedding model configured for the active provider.
+    The returned object can be passed directly to ``VectorStoreIndex``,
+    ``IngestionPipeline``, and ``StorageContext`` without any adapter.
 
-
-
-    The returned object satisfies LlamaIndex's ``BaseEmbedding`` protocol,
-
-    so it can be passed directly to ``VectorStoreIndex`` and ``IngestionPipeline``
-
-    without any adapter layer.
-
-
-
-    Provider mapping:
-
-      - ``"ollama"``   ``OllamaEmbedding`` pointing at ``settings.ollama_base_url``
-
-      - ``"claude"``   Same as ``"ollama"``  see module docstring for rationale.
-
-      - anything else  raises ``ConfigurationError`` immediately.
-
-
+    Provider routing:
+      - EMBEDDING_PROVIDER overrides LLM_PROVIDER for embedding selection.
+        If EMBEDDING_PROVIDER is not set, it defaults to "cohere" in
+        production (groq/claude) and "ollama" in local development.
+      - Cohere is used for all cloud providers (groq, claude, cohere).
+      - Ollama is used only in local development (llm_provider="ollama"
+        AND embedding_provider="ollama").
 
     Args:
-
         settings: The active Settings singleton.
 
-
-
     Returns:
-
-        A configured ``BaseEmbedding`` instance ready for use.
-
-
+        A configured ``BaseEmbedding`` ready for use.
 
     Raises:
-
-        ConfigurationError: If ``settings.llm_provider`` has no registered
-
-            embedding implementation. This fires at startup, not mid-request.
-
-
-
-    Example::
-
-
-
-        embed_model = get_embedding_model(settings)
-
-        vectors = embed_model.get_text_embedding_batch(["sample text"])
-
+        ConfigurationError: If the provider is unsupported or its required
+            API key is absent.
     """
+    embed_provider = settings.embedding_provider
+    model_name     = settings.embedding_model
+    input_type     = settings.embedding_input_type
 
-    provider = settings.llm_provider
+    logger.info(
+        "Embedding provider=%r  model=%r  input_type=%r",
+        embed_provider, model_name, input_type,
+    )
 
-    model_name = settings.embedding_model
+    # ── Cohere (production — all cloud providers) ──────────────────────────────
+    if embed_provider in _COHERE_PROVIDERS:
+        return _build_cohere_embedding(settings, model_name, input_type)
 
-    base_url = settings.ollama_base_url
-
-
-
-    if provider in ("ollama", "claude"):
-
-        # For "claude": generation uses Anthropic's API, but embeddings are
-
-        # served locally via Ollama. This keeps embedding costs zero and
-
-        # avoids vendor lock-in for the vector representation layer.
-
-        logger.info(
-
-            "Loading embedding model %r via Ollama at %s  (generation provider: %r)",
-
-            model_name,
-
-            base_url,
-
-            provider,
-
-        )
-
-        return OllamaEmbedding(
-
-            model_name=model_name,
-
-            base_url=base_url,
-
-            # request_timeout controls how long to wait for the first token
-
-            # from the embedding server. Default (30s) is too short for a
-
-            # cold-start with a large model; 120s is safe for local hardware.
-
-            request_timeout=120.0,
-
-        )
-
-
-
-    #  Unsupported provider  fail fast 
-
-    #
-
-    # We raise ConfigurationError (not ValueError) so the FastAPI
-
-    # exception_handlers.py can map it to a 500 with a structured body,
-
-    # and so tests can catch it by type rather than by message string.
+    # ── Ollama (local development only) ───────────────────────────────────────
+    if embed_provider in _OLLAMA_PROVIDERS:
+        return _build_ollama_embedding(settings, model_name)
 
     raise ConfigurationError(
-
-        setting="llm_provider",
-
+        setting="embedding_provider",
         reason=(
-
-            f"No embedding implementation registered for provider {provider!r}. "
-
-            f"Supported values: 'ollama', 'claude'. "
-
-            f"To add a new provider, extend get_embedding_model() in "
-
-            f"src/knowledge_base/embeddings.py."
-
+            f"No embedding implementation for provider {embed_provider!r}. "
+            f"Supported: 'cohere' (production), 'ollama' (local dev). "
+            f"Set EMBEDDING_PROVIDER in your .env file."
         ),
+    )
 
+
+def _build_cohere_embedding(
+    settings: Settings,
+    model_name: str,
+    input_type: str,
+) -> BaseEmbedding:
+    """
+    Build a CohereEmbedding instance.
+
+    Validates the API key before attempting to construct the client
+    so the error message is clear ('missing key') rather than cryptic
+    ('connection refused' or '401 Unauthorized').
+    """
+    from llama_index.embeddings.cohere import CohereEmbedding
+
+    if not settings.cohere_api_key:
+        raise ConfigurationError(
+            setting="cohere_api_key",
+            reason=(
+                "COHERE_API_KEY must be set when EMBEDDING_PROVIDER='cohere'. "
+                "Get a free key at https://dashboard.cohere.com/api-keys — "
+                "no credit card required."
+            ),
+        )
+
+    api_key = settings.cohere_api_key.get_secret_value()
+
+    logger.info(
+        "Initialising CohereEmbedding: model=%r  input_type=%r",
+        model_name, input_type,
+    )
+
+    return CohereEmbedding(
+        cohere_api_key=api_key,
+        model_name=model_name,
+        # input_type controls which representation subspace is used.
+        # MUST be "search_document" during ingestion.
+        # MUST be "search_query"    during querying.
+        # The scripts/ingest.py overrides this via EMBEDDING_INPUT_TYPE=search_document.
+        input_type=input_type,
+    )
+
+
+def _build_ollama_embedding(settings: Settings, model_name: str) -> BaseEmbedding:
+    """
+    Build an OllamaEmbedding instance for local development.
+
+    Only used when EMBEDDING_PROVIDER=ollama. Not suitable for cloud
+    deployment — Render/Vercel free tier has no GPU and cannot run Ollama.
+    """
+    from llama_index.embeddings.ollama import OllamaEmbedding
+
+    logger.info(
+        "Initialising OllamaEmbedding: model=%r  base_url=%r  "
+        "(local dev only — not suitable for cloud deployment)",
+        model_name, settings.ollama_base_url,
+    )
+
+    return OllamaEmbedding(
+        model_name=model_name,
+        base_url=settings.ollama_base_url,
+        request_timeout=120.0,
     )

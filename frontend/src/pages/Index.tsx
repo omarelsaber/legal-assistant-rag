@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { LandingHeader } from "@/components/legal/LandingHeader";
 import { ChatInput } from "@/components/legal/ChatInput";
 import { MessageBubble } from "@/components/legal/MessageBubble";
 import { TypingIndicator } from "@/components/legal/TypingIndicator";
@@ -87,13 +86,11 @@ const Index = () => {
         playsInline
         className="pointer-events-none absolute inset-0 h-full w-full object-cover -z-20"
       >
-        <source src="/8731207-hd_1920_1080_25fps.mp4" type="video/mp4" />
+        <source src="/chat.mp4" type="video/mp4" />
       </video>
       <div className="pointer-events-none absolute inset-0 bg-slate-950/80 -z-10" />
 
       <div className="relative z-10 flex flex-1 flex-col h-full">
-        <LandingHeader />
-
         <main className="flex flex-1 flex-col overflow-y-auto scrollbar-thin pt-20 pb-4">
         {!hasMessages && !loading ? (
           <WelcomeScreen />

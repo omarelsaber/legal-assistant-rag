@@ -61,20 +61,14 @@ from __future__ import annotations
 
 
 import json
-
 import logging
-
 import sys
-
+import time
 from pathlib import Path
 
-
-
 from llama_index.core import StorageContext, VectorStoreIndex
-
 from llama_index.core.schema import TextNode
-
-
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.core.config import Settings, get_settings
 
@@ -335,47 +329,56 @@ def build_index(
 
 
     #  Step 4: Embed and persist 
-
     embed_model = get_embedding_model(active_settings)
 
-
-
     try:
-
+        # Initialize an empty index with the storage context
         index = VectorStoreIndex(
-
-            nodes=nodes,
-
+            nodes=[],
             storage_context=storage_context,
-
             embed_model=embed_model,
-
-            show_progress=True,   # progress bar during embedding  useful in CLI
-
         )
 
+        # Cohere free tier: 100,000 tokens per minute.
+        # We chunk into batches of 50 to stay under the limit safely.
+        batch_size = 50
+        total_batches = (len(nodes) + batch_size - 1) // batch_size
+        logger.info(
+            "Batching %d nodes into %d batches (size=%d) to respect Cohere rate limits.",
+            len(nodes), total_batches, batch_size
+        )
+
+        @retry(
+            wait=wait_exponential(multiplier=2, min=5, max=60),
+            stop=stop_after_attempt(5),
+            reraise=True
+        )
+        def _insert_batch_with_retry(batch_nodes: list[TextNode]) -> None:
+            # LlamaIndex will automatically embed the text of these nodes
+            index.insert_nodes(batch_nodes)
+
+        for i in range(0, len(nodes), batch_size):
+            batch = nodes[i : i + batch_size]
+            current_batch = (i // batch_size) + 1
+            
+            logger.info("Inserting batch %d/%d (%d nodes)...", current_batch, total_batches, len(batch))
+            _insert_batch_with_retry(batch)
+            
+            # If not the last batch, sleep to cool off the token bucket
+            if current_batch < total_batches:
+                logger.info("Batch inserted. Sleeping 15 seconds to avoid HTTP 429...")
+                time.sleep(15.0)
+
     except Exception as exc:
-
         # Wrap any LlamaIndex / Ollama / ChromaDB exception into our domain type
-
         # so callers get a typed exception with a clear message, not a raw
-
         # llama_index.core.exceptions.EmbeddingModelError stack trace.
-
         raise EmbeddingError(
-
             model=active_settings.embedding_model,
-
             reason=(
-
                 f"VectorStoreIndex construction failed: {exc}. "
-
-                "Ensure Ollama is running and the embedding model is loaded "
-
-                f"(ollama pull {active_settings.embedding_model})."
-
+                "Ensure Ollama is running (if local) and the model is pulled."
             ),
-
         ) from exc
 
 
