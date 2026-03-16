@@ -196,8 +196,8 @@ Each combination of `(embedding_model, chunk_size, chunk_overlap)` produces vect
 ### 1 — Clone and install
 
 ```bash
-git clone https://github.com/your-username/egyptian-law-assistant.git
-cd egyptian-law-assistant
+git clone https://github.com/omarelsaber/legal-assistant-rag.git
+cd legal-assistant-rag
 
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -412,9 +412,10 @@ VITE_API_URL=https://your-render-service.onrender.com
 
 ---
 
-## License
+## License & Author
 
-MIT © 2025
+**Author**: Omar Elsaber  
+**License**: MIT © 2026
 
 ---
 

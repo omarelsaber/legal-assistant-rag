@@ -1,20 +1,26 @@
 # ── RAG Framework ────────────────────────────────────────────────────────────
 llama-index==0.10.68
 llama-index-vector-stores-chroma==0.1.10
-llama-index-embeddings-ollama==0.1.5
-llama-index-embeddings-cohere==0.1.10
-llama-index-llms-ollama==0.1.5
-llama-index-llms-anthropic==0.1.15
+
+# ── LLMs & Embeddings (Providers) ────────────────────────────────────────────
+groq==0.11.0
 llama-index-llms-groq==0.1.4
+
+cohere==5.9.4
+llama-index-embeddings-cohere==0.1.10
+
+ollama==0.3.1
+llama-index-llms-ollama==0.1.5
+llama-index-embeddings-ollama==0.1.5
+
+anthropic==0.34.2
+llama-index-llms-anthropic==0.1.15
+
+# ── Reranking ────────────────────────────────────────────────────────────────
+sentence-transformers==3.1.1
 
 # ── Vector Database ──────────────────────────────────────────────────────────
 chromadb==0.5.5
-
-# ── LLM & Embedding Providers ────────────────────────────────────────────────
-anthropic==0.34.2
-ollama==0.3.1
-groq==0.11.0
-cohere==5.9.4
 
 # ── API ──────────────────────────────────────────────────────────────────────
 fastapi==0.115.0
@@ -31,9 +37,6 @@ python-docx==1.1.2
 # ── LLMOps & Evaluation ──────────────────────────────────────────────────────
 ragas==0.1.21
 mlflow==2.16.2
-
-# ── Reranking ────────────────────────────────────────────────────────────────
-sentence-transformers==3.1.1
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 more-itertools==10.3.0
