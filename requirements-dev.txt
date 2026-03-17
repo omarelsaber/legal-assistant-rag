@@ -1,8 +1,37 @@
-pytest
-pytest-asyncio
-pytest-mock
-ruff
-mypy
-httpx
-pre-commit
-coverage[toml]
+# ════════════════════════════════════════════════════════════════
+#  requirements-dev.txt  —  Local development + ingestion only
+#
+#  Install BOTH files locally:
+#    pip install -r requirements.txt -r requirements-dev.txt
+#
+#  On Render: install requirements.txt ONLY.
+# ════════════════════════════════════════════════════════════════
+
+# ── Local LLM (development only — not on Render) ─────────────────
+llama-index-embeddings-ollama==0.1.5
+llama-index-llms-ollama==0.1.5
+ollama==0.3.1
+
+# ── Document ingestion ────────────────────────────────────────────
+pymupdf==1.24.10
+python-docx==1.1.2
+
+# ── Data pipeline ────────────────────────────────────────────────
+pandas==2.2.2
+pyarrow==17.0.0
+
+# ── Reranker (heavy — 500MB, skip on Render cold starts) ─────────
+sentence-transformers==3.1.1
+
+# ── LLMOps / Evaluation ──────────────────────────────────────────
+ragas==0.1.21
+mlflow==2.16.2
+
+# ── Testing ───────────────────────────────────────────────────────
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-cov==5.0.0
+
+# ── Code quality ─────────────────────────────────────────────────
+ruff==0.6.9
+mypy==1.11.2

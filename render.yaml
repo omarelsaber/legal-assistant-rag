@@ -1,0 +1,53 @@
+# render.yaml — Render deployment configuration
+# Docs: https://render.com/docs/render-yaml
+
+services:
+  - type: web
+    name: egyptian-law-api
+    runtime: python
+    region: oregon
+
+    # Build
+    buildCommand: pip install --no-cache-dir --prefer-binary -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+
+    # Free tier
+    plan: free
+    autoDeploy: true
+
+    # Health checks
+    healthCheckPath: /health
+
+    envVars:
+      # ── Required secrets (set in Render dashboard, not here) ──────────────
+      - key: GROQ_API_KEY
+        sync: false          # must be set manually in Render dashboard
+
+      - key: COHERE_API_KEY
+        sync: false          # must be set manually in Render dashboard
+
+      # ── Provider config ───────────────────────────────────────────────────
+      - key: LLM_PROVIDER
+        value: groq
+
+      - key: GROQ_MODEL
+        value: llama3-70b-8192
+
+      - key: EMBEDDING_PROVIDER
+        value: cohere
+
+      - key: EMBEDDING_MODEL
+        value: embed-multilingual-v3.0
+
+      - key: EMBEDDING_INPUT_TYPE
+        value: search_query            # queries use search_query at runtime
+
+      # ── App config ────────────────────────────────────────────────────────
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: API_RELOAD
+        value: "false"
+
+      - key: PYTHONUNBUFFERED
+        value: "1"                       # ensures logs appear in real time

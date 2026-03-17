@@ -1,10 +1,70 @@
-llama-index
-llama-index-vector-stores-chroma
-groq
-llama-index-llms-groq
-cohere
-llama-index-embeddings-cohere
-fastapi
-uvicorn
-python-dotenv
-tenacity
+# ════════════════════════════════════════════════════════════════
+#  requirements.txt  —  Render Production (API server only)
+#
+#  This file is INTENTIONALLY minimal. It contains only what the
+#  live query API needs. Ingestion, evaluation, and data-prep
+#  dependencies are in requirements-dev.txt and are run locally.
+#
+#  Pinning strategy:
+#    - Top-level packages: pinned to exact version (==)
+#    - Conflict zone (httpx, httpcore, click, anyio): pinned explicitly
+#      to prevent pip backtracking. These four packages are pulled
+#      transitively by chromadb, cohere, groq, and fastapi with
+#      overlapping but non-identical ranges. Explicit pins let pip
+#      skip the resolver loop entirely.
+#
+#  Build command for Render:
+#    pip install --no-cache-dir --prefer-binary -r requirements.txt
+# ════════════════════════════════════════════════════════════════
+
+# ── LlamaIndex (core + used integrations only) ───────────────────
+llama-index-core==0.10.68
+llama-index-llms-groq==0.1.4
+llama-index-embeddings-cohere==0.1.10
+llama-index-vector-stores-chroma==0.1.10
+
+# ── LLM + Embedding providers ────────────────────────────────────
+groq==0.11.0
+cohere==5.9.4
+
+# ── Vector database ───────────────────────────────────────────────
+chromadb==0.5.5
+
+# ── HTTP conflict zone — pin ALL to stop backtracking ────────────
+# chromadb==0.5.5 requires httpx>=0.27.0,<0.28  (tightest constraint)
+# cohere==5.9.4   requires httpx>=0.21.2,<0.29
+# groq==0.11.0    requires httpx>=0.23.0,<1
+# → httpx==0.27.2 is the only version satisfying all three.
+#   Without this pin, pip downloads ~40 httpx versions before finding it.
+httpx==0.27.2
+httpcore==1.0.7
+h11==0.14.0
+
+# anyio is required by httpcore + starlette with overlapping ranges
+anyio==4.6.2
+sniffio==1.3.1
+
+# click: chromadb's transitive typer dependency pins click<9
+# Without this pin, pip backtracks through every typer version.
+click==8.1.7
+
+# openai is a llama-index-core transitive dep; pin to avoid its own
+# sub-resolution loop (openai pulls distro, which itself backtracks)
+openai==1.51.0
+distro==1.9.0
+
+# ── API server ────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn==0.30.6
+starlette==0.41.0
+
+# ── Config & validation ───────────────────────────────────────────
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+
+# ── Utilities ────────────────────────────────────────────────────
+tenacity==9.0.0
+structlog==24.4.0
+more-itertools==10.3.0
+typing-extensions==4.12.2
