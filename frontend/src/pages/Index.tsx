@@ -42,7 +42,8 @@ const Index = () => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/query", {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+      const res = await fetch(`${API_URL}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: text, top_k: 5 }),
