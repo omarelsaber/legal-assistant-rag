@@ -8,8 +8,8 @@
 # ════════════════════════════════════════════════════════════════
 
 # ── Local LLM (development only — not on Render) ─────────────────
-llama-index-embeddings-ollama==0.1.5
-llama-index-llms-ollama==0.1.5
+llama-index-embeddings-ollama
+llama-index-llms-ollama
 ollama==0.3.1
 
 # ── Document ingestion ────────────────────────────────────────────
