@@ -61,7 +61,7 @@ const Index = () => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-      const res = await fetch(`${API_URL}/api/v1/query`, {
+      const res = await fetch(`${API_URL}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: text, top_k: 5 }),
