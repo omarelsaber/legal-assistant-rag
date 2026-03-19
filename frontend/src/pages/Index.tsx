@@ -59,7 +59,7 @@ const Index = () => {
 
       // Now send the real request with a generous timeout
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      const timeout = setTimeout(() => controller.abort(), 150000); // 150 second timeout
 
       const res = await fetch(`${API_URL}/query`, {
         method: "POST",
