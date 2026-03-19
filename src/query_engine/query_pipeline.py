@@ -343,9 +343,13 @@ async def execute_query(
     # signals the model started answering instead of rewriting).
     rewritten_query = request.query
     try:
-        rewrite_result = await llm.acomplete(
-            _REWRITE_PROMPT.format(query=request.query)
+        logger.info(">>>> TRACKER: Step 4 - Sending query to Groq for REWRITING...")
+        # Wrap the rewrite call in a 10-second timeout to prevent the API from hanging
+        rewrite_result = await asyncio.wait_for(
+            llm.acomplete(_REWRITE_PROMPT.format(query=request.query)),
+            timeout=10.0
         )
+        logger.info(">>>> TRACKER: Step 4 - Query rewriting DONE!")
         candidate = rewrite_result.text.strip()
         if candidate and len(candidate) < 500 and _is_arabic_clean(candidate):
             rewritten_query = candidate
@@ -362,7 +366,7 @@ async def execute_query(
         else:
             logger.warning("Query rewrite empty/oversized — using original.")
     except Exception as exc:
-        logger.warning("Query rewriting failed (%s) — using original query.", exc)
+        logger.warning("Query rewriting failed/timed out (%s) — using original query.", exc)
 
     # ── Step 5: Assemble query engine ──────────────────────────────────────────
     #

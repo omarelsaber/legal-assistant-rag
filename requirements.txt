@@ -21,14 +21,14 @@
 llama-index-core==0.10.68
 llama-index-llms-groq==0.1.4
 llama-index-embeddings-cohere==0.1.9
-llama-index-vector-stores-chroma==0.1.9
+llama-index-vector-stores-pinecone
 
 # ── LLM + Embedding providers ────────────────────────────────────
 groq==0.11.0
 cohere==5.9.4
 
 # ── Vector database ───────────────────────────────────────────────
-chromadb==0.5.5
+pinecone-client
 
 # ── HTTP conflict zone — pin ALL to stop backtracking ────────────
 # chromadb==0.5.5 requires httpx>=0.27.0,<0.28  (tightest constraint)
