@@ -395,24 +395,26 @@ async def execute_query(
 
 
 async def _run_query(query_engine: RetrieverQueryEngine, query_str: str) -> object:
-    """
-    Execute the query engine non-blocking.
-    Primary: native aquery(). Fallback: run_in_executor for sync-only engines.
-    """
+    from llama_index.core.schema import QueryBundle
+    from llama_index.core.settings import Settings as LlamaSettings
+    
     try:
-        logger.debug("Running aquery() (native async path)")
-        return await query_engine.aquery(query_str)
-
-    except NotImplementedError:
-        logger.warning(
-            "aquery() raised NotImplementedError — "
-            "falling back to run_in_executor (thread pool)."
-        )
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,
-            functools.partial(query_engine.query, query_str),
-        )
+        bundle = QueryBundle(query_str)
+        
+        embed_model = getattr(query_engine.retriever, "_embed_model", LlamaSettings.embed_model)
+        
+        logger.info(">>>> TRACKER: Starting to generate embedding for query (Calling Cohere)...")
+        if bundle.embedding is None and embed_model is not None:
+            bundle.embedding = await embed_model.aget_text_embedding(query_str)
+            
+        logger.info(">>>> TRACKER: Embedding generated! Now querying ChromaDB...")
+        nodes = await query_engine.aretrieve(bundle)
+        
+        logger.info(">>>> TRACKER: ChromaDB query done! Now sending prompt to Groq (LLM)...")
+        res = await query_engine.asynthesize(bundle, nodes=nodes)
+        
+        logger.info(">>>> TRACKER: Groq responded! Returning answer to frontend.")
+        return res
 
     except Exception as exc:
         exc_type = type(exc).__name__
