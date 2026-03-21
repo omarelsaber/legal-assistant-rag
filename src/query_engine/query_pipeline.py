@@ -403,20 +403,43 @@ async def _run_query(query_engine: RetrieverQueryEngine, query_str: str) -> obje
     
     try:
         bundle = QueryBundle(query_str)
-        
         embed_model = getattr(query_engine.retriever, "_embed_model", LlamaSettings.embed_model)
         
+        # ── 1. Cohere Embedding (Timeout: 10s) ──
         logger.info(">>>> TRACKER: Starting to generate embedding for query (Calling Cohere)...")
         if bundle.embedding is None and embed_model is not None:
-            bundle.embedding = await embed_model.aget_text_embedding(query_str)
+            try:
+                bundle.embedding = await asyncio.wait_for(
+                    embed_model.aget_text_embedding(query_str),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(">>>> TRACKER: ❌ Cohere API timed out after 10 seconds!")
+                raise TimeoutError("Cohere Embedding API timed out")
+                
+        # ── 2. Pinecone Retrieval (Timeout: 15s) ──
+        logger.info(">>>> TRACKER: Embedding generated! Now querying Pinecone/VectorStore...")
+        try:
+            nodes = await asyncio.wait_for(
+                query_engine.aretrieve(bundle),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(">>>> TRACKER: ❌ Pinecone API timed out after 15 seconds!")
+            raise TimeoutError("Pinecone Retrieval API timed out")
             
-        logger.info(">>>> TRACKER: Embedding generated! Now querying ChromaDB...")
-        nodes = await query_engine.aretrieve(bundle)
-        
-        logger.info(">>>> TRACKER: ChromaDB query done! Now sending prompt to Groq (LLM)...")
-        res = await query_engine.asynthesize(bundle, nodes=nodes)
-        
-        logger.info(">>>> TRACKER: Groq responded! Returning answer to frontend.")
+        # ── 3. Groq LLM Synthesis (Timeout: 45s) ──
+        logger.info(">>>> TRACKER: VectorStore query done! Now sending prompt to Groq (LLM)...")
+        try:
+            res = await asyncio.wait_for(
+                query_engine.asynthesize(bundle, nodes=nodes),
+                timeout=45.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(">>>> TRACKER: ❌ Groq LLM API timed out after 45 seconds!")
+            raise TimeoutError("Groq Synthesis API timed out")
+            
+        logger.info(">>>> TRACKER: ✅ Groq responded! Returning answer to frontend.")
         return res
 
     except Exception as exc:
@@ -425,9 +448,13 @@ async def _run_query(query_engine: RetrieverQueryEngine, query_str: str) -> obje
             kw in exc_type.lower()
             for kw in ("timeout", "ratelimit", "connection", "unavailable")
         )
+        
+        # تمرير رسالة الـ Timeout المخصصة بتاعتنا لو هي السبب
+        reason_msg = str(exc) if "timed out" in str(exc) else f"Query execution failed ({exc_type}): {exc}"
+        
         raise LLMProviderError(
             provider="unknown",
-            reason=f"Query execution failed ({exc_type}): {exc}",
+            reason=reason_msg,
             retryable=retryable,
         ) from exc
 
