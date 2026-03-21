@@ -309,91 +309,54 @@ async def execute_query(
     active_settings = settings or get_settings()
     provider = active_settings.llm_provider
 
-    logger.info(
-        "Executing query: top_k=%d  provider=%r  query=%r",
-        request.top_k, provider, request.query[:80],
-    )
-
-    # ── Step 1: Load index ─────────────────────────────────────────────────────
+    logger.info(">>>> TRACKER: Step 1 - Loading Index...")
     try:
         index = load_index(settings=active_settings)
     except Exception as exc:
-        raise RetrievalError(
-            f"Failed to load index from Pinecone: {exc}. "
-            "Run `make ingest` to populate the index before querying."
-        ) from exc
+        raise RetrievalError(f"Failed to load index from Pinecone: {exc}") from exc
 
-    # ── Step 2: Broad retrieval (top-20 candidates for the reranker) ───────────
+    logger.info(">>>> TRACKER: Step 2 - Getting Retriever...")
     retriever = get_retriever(index, top_k=20)
 
-    # ── Step 3: Load LLM ───────────────────────────────────────────────────────
+    logger.info(">>>> TRACKER: Step 3 - Loading LLM...")
     try:
         llm = get_llm(active_settings)
     except Exception as exc:
-        raise LLMProviderError(
-            provider=provider,
-            reason=f"Failed to initialise LLM provider: {exc}",
-            retryable=False,
-        ) from exc
+        raise LLMProviderError(provider=provider, reason=f"Failed to load LLM: {exc}", retryable=False) from exc
 
-    # ── Step 4: Query rewriting (colloquial → formal legal Arabic) ─────────────
-    # Best-effort: on any failure, fall back to the original query silently.
-    # Guard: reject rewrites that are empty or suspiciously long (>500 chars
-    # signals the model started answering instead of rewriting).
+    logger.info(">>>> TRACKER: Step 4 - Rewriting Query...")
     rewritten_query = request.query
     try:
-        logger.info(">>>> TRACKER: Step 4 - Sending query to Groq for REWRITING...")
-        # Wrap the rewrite call in a 10-second timeout to prevent the API from hanging
         rewrite_result = await asyncio.wait_for(
             llm.acomplete(_REWRITE_PROMPT.format(query=request.query)),
             timeout=10.0
         )
-        logger.info(">>>> TRACKER: Step 4 - Query rewriting DONE!")
         candidate = rewrite_result.text.strip()
         if candidate and len(candidate) < 500 and _is_arabic_clean(candidate):
             rewritten_query = candidate
-            logger.info(
-                "Query rewritten:\n  Original : %r\n  Rewritten: %r",
-                request.query, rewritten_query,
-            )
-        elif candidate and not _is_arabic_clean(candidate):
-            logger.warning(
-                "Query rewrite rejected — contains non-Arabic characters: %r. "
-                "Using original query.",
-                candidate,
-            )
-        else:
-            logger.warning("Query rewrite empty/oversized — using original.")
+            logger.info("Query rewritten: %r", rewritten_query)
     except Exception as exc:
-        logger.warning("Query rewriting failed/timed out (%s) — using original query.", exc)
+        logger.warning("Query rewrite failed/timed out, using original. Error: %s", exc)
 
-    # ── Step 5: Assemble query engine ──────────────────────────────────────────
-    #
-    # response_mode="simple_summarize" ← THE FIX FOR ENGLISH LEAKAGE
-    #
-    # See module docstring for full explanation.
-    # In short: simple_summarize calls our Arabic template ONCE.
-    # compact would call the English refine_template on overflow → leaks English.
-    #
-    # Post-processor ORDER IS MANDATORY:
-    #   [0] CrossEncoderReranker   — scores clean text, must run FIRST
-    #   [1] MetadataMappingPostprocessor — formats text, must run SECOND
+    logger.info(">>>> TRACKER: Step 5 - Assembling Query Engine (Without Reranker)...")
     top_n = request.top_k if request.top_k else 5
+    
+    # 🚨 تم إيقاف الـ Reranker لأنه بيحتاج رامات 2 جيجا وبيقتل السيرفر المجاني
     query_engine = RetrieverQueryEngine.from_args(
         retriever=retriever,
         llm=llm,
-        response_mode="simple_summarize",       # ← THE FIX
+        response_mode="simple_summarize",
         text_qa_template=PromptTemplate(_ARABIC_QA_PROMPT),
         node_postprocessors=[
-            CrossEncoderReranker(top_n=top_n),  # 1st: score on clean text
-            MetadataMappingPostprocessor(),      # 2nd: format citation headers
+            # CrossEncoderReranker(top_n=top_n),  <-- معطل
+            MetadataMappingPostprocessor(),
         ],
     )
 
-    # ── Step 6: Execute query (async, non-blocking) ────────────────────────────
+    logger.info(">>>> TRACKER: Step 6 - Executing Async Query...")
     raw_response = await _run_query(query_engine, rewritten_query)
 
-    # ── Step 7: Domain boundary exit ──────────────────────────────────────────
+    logger.info(">>>> TRACKER: Step 7 - Mapping Response to exit...")
     return map_response(raw_response, provider=provider)
 
 
