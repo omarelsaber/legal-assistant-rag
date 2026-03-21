@@ -302,7 +302,6 @@ class MetadataMappingPostprocessor(BaseNodePostprocessor):
 async def execute_query(
     request: QueryRequest,
     settings: Settings | None = None,
-    persist_dir: str = "./chroma_db",
 ) -> QueryResponse:
     """
     Execute a full RAG query and return a domain ``QueryResponse``.
@@ -317,10 +316,10 @@ async def execute_query(
 
     # ── Step 1: Load index ─────────────────────────────────────────────────────
     try:
-        index = load_index(settings=active_settings, persist_dir=persist_dir)
+        index = load_index(settings=active_settings)
     except Exception as exc:
         raise RetrievalError(
-            f"Failed to load index from ChromaDB: {exc}. "
+            f"Failed to load index from Pinecone: {exc}. "
             "Run `make ingest` to populate the index before querying."
         ) from exc
 
